@@ -1,0 +1,228 @@
+"""
+Generador de Estímulo Visual con Barrido de Frecuencia Exponencial
+y Atenuación Exponencial del Contraste
+
+Este programa genera una imagen que muestra:
+- Barrido de frecuencia exponencial en el eje horizontal (x)
+- Atenuación exponencial negativa del contraste en el eje vertical (y)
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
+
+def generar_estimulo_visual(
+    ancho=1024,
+    alto=1024,
+    freq_inicial=1.0,
+    freq_final=100.0,
+    tasa_atenuacion=5.0,
+    guardar=True,
+    nombre_archivo='estimulo_visual.png'
+):
+    """
+    Genera un estímulo visual con las características especificadas.
+    
+    Parámetros:
+    -----------
+    ancho : int
+        Ancho de la imagen en píxeles
+    alto : int
+        Alto de la imagen en píxeles
+    freq_inicial : float
+        Frecuencia inicial del barrido (ciclos por unidad)
+    freq_final : float
+        Frecuencia final del barrido (ciclos por unidad)
+    tasa_atenuacion : float
+        Tasa de atenuación exponencial del contraste
+    guardar : bool
+        Si True, guarda la imagen en archivo
+    nombre_archivo : str
+        Nombre del archivo de salida
+    
+    Retorna:
+    --------
+    imagen : ndarray
+        Array 2D con los valores de la imagen
+    """
+    
+    # Crear coordenadas normalizadas
+    x = np.linspace(0, 1, ancho)
+    y = np.linspace(0, 1, alto)
+    X, Y = np.meshgrid(x, y)
+    
+    # Barrido de frecuencia exponencial en x
+    # f(x) = f_inicial * (f_final/f_inicial)^x
+    freq_ratio = freq_final / freq_inicial
+    frecuencia_instantanea = freq_inicial * (freq_ratio ** X)
+    
+    # Fase acumulada para barrido exponencial
+    # φ(x) = 2π * f_inicial * (freq_ratio^x - 1) / ln(freq_ratio)
+    fase = 2 * np.pi * freq_inicial * (freq_ratio ** X - 1) / np.log(freq_ratio)
+    
+    # Generar senoidal con barrido de frecuencia
+    senoidal = np.sin(fase)
+    
+    # Atenuación exponencial del contraste en dirección vertical
+    # El contraste disminuye exponencialmente hacia arriba (Y aumenta)
+    # Invertir Y para que la atenuación sea de abajo hacia arriba
+    Y_invertido = 1 - Y  # Ahora 1 está abajo y 0 arriba
+    atenuacion = np.exp(-tasa_atenuacion * (1 - Y_invertido))
+    
+    # Aplicar atenuación a la senoidal
+    # Contraste = amplitud de la senoidal * atenuación
+    imagen = senoidal * atenuacion
+    
+    # Normalizar a rango [0, 1] para visualización
+    # Mantener el valor medio en 0.5 (gris medio)
+    imagen_normalizada = 0.5 + 0.5 * imagen
+    
+    # Asegurar que los valores estén en [0, 1]
+    imagen_normalizada = np.clip(imagen_normalizada, 0, 1)
+    
+    # Visualizar
+    fig, ax = plt.subplots(figsize=(10, 10))
+    im = ax.imshow(imagen_normalizada, cmap='gray', aspect='auto', origin='lower')
+    ax.set_xlabel('Posición Horizontal (x)')
+    ax.set_ylabel('Posición Vertical (y)')
+    ax.set_title('Estímulo Visual: Barrido Exponencial + Atenuación de Contraste')
+    
+    # Añadir barra de color
+    plt.colorbar(im, ax=ax, label='Intensidad')
+    
+    plt.tight_layout()
+    
+    if guardar:
+        plt.savefig(nombre_archivo, dpi=150, bbox_inches='tight')
+        print(f"Imagen guardada como: {nombre_archivo}")
+    
+    plt.show()
+    
+    return imagen_normalizada
+
+
+def visualizar_MTF(imagen):
+    """
+    Visualiza la Función de Transferencia de Modulación (MTF).
+    
+    Parámetros:
+    -----------
+    imagen : ndarray
+        Array 2D con la imagen generada
+    """
+    # Calcular FFT 2D
+    fft_2d = np.fft.fft2(imagen)
+    fft_2d_shifted = np.fft.fftshift(fft_2d)
+    magnitud = np.abs(fft_2d_shifted)
+    
+    # Visualizar espectro de frecuencias
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Imagen original
+    ax1.imshow(imagen, cmap='gray', aspect='auto')
+    ax1.set_title('Estímulo Visual')
+    ax1.set_xlabel('x')
+    ax1.set_ylabel('y')
+    
+    # Espectro de frecuencias (escala logarítmica)
+    ax2.imshow(np.log1p(magnitud), cmap='viridis', aspect='auto')
+    ax2.set_title('Espectro de Frecuencias (MTF)')
+    ax2.set_xlabel('Frecuencia horizontal')
+    ax2.set_ylabel('Frecuencia vertical')
+    
+    plt.tight_layout()
+    plt.savefig('mtf_visualizacion.png', dpi=150, bbox_inches='tight')
+    print("MTF guardada como: mtf_visualizacion.png")
+    plt.show()
+
+
+def generar_variaciones():
+    """
+    Genera múltiples variaciones del estímulo con diferentes parámetros.
+    """
+    configuraciones = [
+        {'freq_inicial': 1, 'freq_final': 50, 'tasa_atenuacion': 4.0, 
+         'nombre_archivo': 'estimulo_1.png'},
+        {'freq_inicial': 2, 'freq_final': 100, 'tasa_atenuacion': 5.0, 
+         'nombre_archivo': 'estimulo_2.png'},
+        {'freq_inicial': 1, 'freq_final': 150, 'tasa_atenuacion': 6.0, 
+         'nombre_archivo': 'estimulo_3.png'},
+    ]
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    
+    for i, config in enumerate(configuraciones):
+        x = np.linspace(0, 1, 1024)
+        y = np.linspace(0, 1, 1024)
+        X, Y = np.meshgrid(x, y)
+        
+        freq_ratio = config['freq_final'] / config['freq_inicial']
+        fase = 2 * np.pi * config['freq_inicial'] * (freq_ratio ** X - 1) / np.log(freq_ratio)
+        senoidal = np.sin(fase)
+        
+        # Atenuación corregida
+        Y_invertido = 1 - Y
+        atenuacion = np.exp(-config['tasa_atenuacion'] * (1 - Y_invertido))
+        imagen = senoidal * atenuacion
+        imagen_normalizada = 0.5 + 0.5 * imagen
+        imagen_normalizada = np.clip(imagen_normalizada, 0, 1)
+        
+        axes[i].imshow(imagen_normalizada, cmap='gray', aspect='auto', origin='lower')
+        axes[i].set_title(f"f: {config['freq_inicial']}-{config['freq_final']}, τ: {config['tasa_atenuacion']}")
+        axes[i].axis('off')
+    
+    plt.tight_layout()
+    plt.savefig('variaciones_estimulo.png', dpi=150, bbox_inches='tight')
+    print("Variaciones guardadas como: variaciones_estimulo.png")
+    plt.show()
+
+
+if __name__ == "__main__":
+    print("="*60)
+    print("Generador de Estímulo Visual")
+    print("="*60)
+    print()
+    
+    # Generar estímulo principal
+    print("Generando estímulo visual principal...")
+    imagen = generar_estimulo_visual(
+        ancho=1024,
+        alto=1024,
+        freq_inicial=1.0,
+        freq_final=100.0,
+        tasa_atenuacion=5.0,
+        guardar=True,
+        nombre_archivo='estimulo_visual.png'
+    )
+    
+    print()
+    print("Función matemática utilizada:")
+    print("-" * 60)
+    print("I(x,y) = sin(φ(x)) · exp(-τ·y)")
+    print()
+    print("Donde:")
+    print("  φ(x) = 2π·f₀·(r^x - 1)/ln(r)    [Fase con barrido exponencial]")
+    print("  r = f_final/f_inicial             [Ratio de frecuencias]")
+    print("  τ = tasa de atenuación            [Constante de decaimiento]")
+    print("-" * 60)
+    print()
+    
+    # Visualizar MTF
+    print("Generando visualización de MTF...")
+    visualizar_MTF(imagen)
+    
+    print()
+    # Generar variaciones
+    print("Generando variaciones del estímulo...")
+    generar_variaciones()
+    
+    print()
+    print("="*60)
+    print("Proceso completado!")
+    print("="*60)
+    print()
+    print("Archivos generados:")
+    print("  - estimulo_visual.png")
+    print("  - mtf_visualizacion.png")
+    print("  - variaciones_estimulo.png")
